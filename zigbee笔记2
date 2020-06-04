@@ -1,0 +1,29 @@
+端点(EndPoint)
+1. 他是一个字节编号的，数据收和发送的基本单元，在模块通信的时候，发送模块必须指定收发双方模块的网络地址和端点
+2. 端点要使用必须要和模块理的某个任务挂钩定义;
+    首先每一个端点可以看成是一个1个字节数字编号的开有一扇门的房间，数据最终的目标是进入到无线数据包指定的目标端点房间，
+	而取无线数据这个相关的代码在任务事件处理函数里，TI协议栈有那么多的任务事件处理函数，所以必须要指定在哪个任务事件处理函数 来
+	取这个无线数据包里面的有用数据。
+3.  一个端点只能挂钩在一个任务上，而一个任务可以挂钩多个端点，且端点对所有的任务是公用的，定义一个少一个
+
+簇 Cluster
+簇就相当于端点房间里面的人，是接收最终的目标。这个东西是两个字节编号，在射频发送的时候，必须指定接收模块的簇，发送模块的簇不需要指定
+
+Profile ID 在端点描述符里有提到，在任务初始化的时候指定
+
+端点描述符里面还有一个ClusterList
+const SimpleDescriptionFormat_t GenericApp_SimpleDesc =
+{
+  GENERICAPP_ENDPOINT,              //  int Endpoint;
+  GENERICAPP_PROFID,                //  uint16 AppProfId[2];
+  GENERICAPP_DEVICEID,              //  uint16 AppDeviceId[2];
+  GENERICAPP_DEVICE_VERSION,        //  int   AppDevVer:4;
+  GENERICAPP_FLAGS,                 //  int   AppFlags:4;
+  GENERICAPP_MAX_CLUSTERS,          //  byte  AppNumInClusters;
+  (cId_t *)GenericApp_ClusterList,  //  byte *pAppInClusterList;
+  GENERICAPP_MAX_CLUSTERS,          //  byte  AppNumInClusters;
+  (cId_t *)GenericApp_ClusterList   //  byte *pAppInClusterList;
+};
+其中的GenericApp_ClusterList，实际通信过程中，我们只有在在AF_INCOMING_MSG_CMD消息处理中指定cluster id，才会对通信起影响，而端点描述符
+中的两个clusterlist，如果不指定不影响通信，它们的作用只是在zigbee网络中别的节点会查询这个节点是否定义了某个簇，如果没有在clusterlist中指定
+则查询不到。

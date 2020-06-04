@@ -1,0 +1,26 @@
+TI cc2530在出厂时每一颗芯片都固化了一个唯一的8字节的地址，MAC或者IEEE地址。
+网络短地址在网络唯一。
+
+获取地址相关函数
+#include "NL_MEDE.h"
+
+extern byte * NLME_GetExtAddr(void);//获得本模块的mac地址
+extern uint16 NLME_GetShortAddr(void);//获得本模块的网络地址
+
+extern uint16 NLME_GetCoorShortAddr(void);
+extern void NLME_GetCoorExtAddr(byte *);
+
+以Mac地址发送数据的时候和以网络短地址（单播）发送数据的时候区别:
+实际zigbee通信过程中，不会以Mac地址通信，只会以网络短地址进行通信，
+zigbee协议栈底层有一个地址管理器，成对儿存储了经常与自己通信的其他节点的
+zigbee的mac地址和网络地址，如果向一个不经常与自己通信的节点发送数据，且
+地址管理器中没有存储此节点的地址，则发送数据会失败，为了保证成功，我们可以
+先获取目标节点的地址（根据mac地址获取网络地址），保证地址管理器里有此节点，然后再调用发送函数
+调用
+afStatus_t ZDP_NwkAddrReq( uint8 *IEEEAddress, byte ReqType,
+                           byte StartIndex, byte SecurityEnable );//此函数会发送一个广播，根据mac获取网络地址
+//携带接收目标模块的mac地址，广播出去，网络里，所有节点都会收到，底层判断这个mac和自己的mac地址是否一致，如果一致
+//则回一个无线数据包给发送模块，发送模块就会知道，这样发送模块一定在地址管理器里有它的地址相关信息
+
+//然后延时一段时间再发送数据
+osal_start_timerEx(GenericApp_TaskID, GenericApp_SEND_MSG_EVT,30);//在GenericApp_SEND_MSG_EVT事件中发送数据

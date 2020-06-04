@@ -1,0 +1,60 @@
+1. 绑定是zigbee的一种基本通信方式，具体绑定通信又分成3种模式，只拿源绑定来说明
+源绑定：
+    发送模块，必须知道接收模块（被绑定模块）的网络地址或者mac地址
+	            接收方的接收端点
+				接收方的接收簇
+				
+单播：
+    无线数据包里面携带了: 发送模块的网络地址
+	                      发送模块的发送端点
+						  接收模块的网络地址
+						  接收模块的接收端点
+						  接收模块的接收簇
+mac地址通信：
+    无线数据包携带的内容与单播一致
+	但是mac地址通讯不知道接收模块的网络地址，需要到地址管理器中去查找网络地址，查找到之后用网络地址替代mac地址
+
+绑定：
+    无线数据包携带内容一致， 源绑定： 发送模块必须要知道接收模块（也就是被绑定模块）的网络地址或者mac地址
+	接收端点，接收簇
+	在发送模块里，会调用一个函数，这个函数会创建一个结构体（绑定表），结构体里面含有的： 发送模块的发送端点，接收模块的mac地址
+	接收模块的接收端点，接收模块的接收簇，另外还要确保发送模块的地址管理器里面接收模块的mac地址以及网络短地址
+	
+	源绑定：在发送模块（源头发送模块）里面创建了和它绑定的模块的绑定表
+	调用发送函数，以绑定的方式发送，绑定的时候发送指定的信息有： 接收模块的接收端点，接收簇，发送模块的发送端点，不指定接收模块
+	的地址相关信息。
+	
+	实际的机制是，发送数据时，先去绑定表里查询 指定的接收模块的端点,接收簇 以及发送模块的端点是否有匹配的，有匹配的就取出此绑定表中的mac地址，然后
+	去地址管理器里去查询此mac地址对应的网络短地址，然后用此网络短地址为目标地址发送数据，其实和单播mac地址通信是很相似的。
+	
+	绑定其实是一厢情愿的，发送方绑定完接收方，所有的工作（主要是建立绑定表）都是在发送方做完的，接收方根本不知道自己被绑定了
+	创建绑定表
+	
+	实例如下：
+	zAddrType_t destination;
+	destination.addrMode = Addr64Bit;
+	memcpy(destination.addr.extAddr, DestMac, 8);
+	//创建绑定表，与接收模块进行绑定
+	extern ZStatus_t APSME_BindRequest( byte SrcEndpInt, uint16 ClusterId, zAddrType_t *DstAddr, byte DstEndpInt);//参数分别对应发送模块的发送端点，接收模块接收簇，接收模块的接收地址（mac地址形式），接收模块的接收端点
+	
+	afStatus_t ZDP_NwkAddrReq( uint8 *IEEEAddress, byte ReqType,
+                           byte StartIndex, byte SecurityEnable );//此函数会发送一个广播，根据mac获取网络地址
+	//携带接收目标模块的mac地址，广播出去，网络里，所有节点都会收到，底层判断这个mac和自己的mac地址是否一致，如果一致
+	//则回一个无线数据包给发送模块，发送模块就会知道，这样发送模块一定在地址管理器里有它的地址相关信息
+
+	//然后延时一段时间再发送数据
+	osal_start_timerEx(GenericApp_TaskID, GenericApp_SEND_MSG_EVT,30);//在GenericApp_SEND_MSG_EVT事件中发送数据
+	
+	//然后30ms后在GenericApp_SEND_MSG_EVT事件中，以绑定的方式发送数据
+	char theMessageData[] = {8};
+	GenericApp_DstAddr.addrMode = (afAddrMode_t)AddrNotPresent;//不指定地址  也就是以绑定的方式发送
+	GenericApp_DstAddr.endPoint = GenericApp_ENDPOINT; 
+	
+	AF_DATARequest(&GenericApp_DstAddr, $GenericApp_epDesc,
+					GenericApp_CLUSTERID,
+					1,
+					(byte *)theMessageData,
+					&GenericApp_TransID,
+					AF_DISCV_ROUTE, AF_DEFAULT_RADIUS);
+	
+	
